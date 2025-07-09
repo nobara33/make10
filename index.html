@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>Make 10</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding-top: 0em;
+      padding-bottom: 0em;
+      transform: scale(0.9);
+      transform-origin: top center;
+    }
+    h1 {
+      margin-top: 0;
+      margin-bottom: 0;
+    }
+    .number-cards {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin: 20px 0;
+    }
+    .card {
+      width: 60px;
+      height: 80px;
+      background-color: #f0f0f0;
+      border: 2px solid #333;
+      border-radius: 10px;
+      font-size: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    }
+    input {
+      font-size: 20px;
+      width: 300px;
+      margin-bottom: 10px;
+    }
+    .button-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 480px; /* 少し幅広げて降参ボタンも収まるように */
+      margin: 0 auto 20px auto;
+    }
+    .button-grid button {
+      font-size: 18px;
+      margin: 5px;
+      width: 60px;
+      height: 45px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+    }
+    .action-buttons {
+      margin: 10px 0;
+    }
+    .action-buttons button {
+      font-size: 18px;
+      padding: 10px 20px;
+      margin: 5px;
+      min-width: 140px;
+      cursor: pointer;
+    }
+    .result {
+      font-weight: bold;
+      font-size: 24px;
+      margin-top: 20px;
+      white-space: pre-wrap;
+      text-align: center;
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
+      min-height: 2em;
+    }
+  </style>
+</head>
+<body>
+  <h1>Make 10</h1>
+
+  <div class="number-cards" id="numbers"></div>
+
+  <input type="text" id="expression" placeholder="式を入力またはボタンで作成" readonly />
+
+  <div class="button-grid">
+    <button onclick="handleClick('1')">1</button>
+    <button onclick="handleClick('2')">2</button>
+    <button onclick="handleClick('3')">3</button>
+    <button onclick="handleClick('4')">4</button>
+    <button onclick="handleClick('5')">5</button>
+    <button onclick="handleClick('6')">6</button>
+    <button onclick="handleClick('7')">7</button>
+    <button onclick="handleClick('8')">8</button>
+    <button onclick="handleClick('9')">9</button>
+    <button onclick="handleClick('0')">0</button>
+    <button onclick="handleClick('+')">＋</button>
+    <button onclick="handleClick('-')">−</button>
+    <button onclick="handleClick('×')">×</button>
+    <button onclick="handleClick('÷')">÷</button>
+    <button onclick="handleClick('(')">(</button>
+    <button onclick="handleClick(')')">)</button>
+    <button onclick="handleClick('{')">{</button>
+    <button onclick="handleClick('}')">}</button>
+    <button onclick="backspace()">←</button>
+    <button onclick="clearExpression()">C</button>
+    <button style="width:80px;" onclick="checkNoSolution()">解なし</button>
+    <button style="width:80px;" onclick="showHint()">降参</button> <!-- ここを解なしの右隣に追加 -->
+  </div>
+
+  <div class="action-buttons">
+    <button onclick="checkAnswer()">✅ Check</button>
+    <button onclick="generateNumbers()">🔄 New Question</button>
+  </div>
+
+  <div class="result" id="result"></div>
+
+  <script>
+    let currentNumbers = [];
+
+    function generateNumbers() {
+      currentNumbers = [];
+      const numbersContainer = document.getElementById('numbers');
+      numbersContainer.innerHTML = '';
+      while (currentNumbers.length < 4) {
+        currentNumbers.push(Math.floor(Math.random() * 9) + 1);
+      }
+      currentNumbers.forEach(num => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.textContent = num;
+        numbersContainer.appendChild(card);
+      });
+      document.getElementById('expression').value = '';
+      document.getElementById('result').textContent = '';
+    }
+
+    function handleClick(symbol) {
+      const input = document.getElementById('expression');
+      input.value += symbol;
+    }
+
+    function clearExpression() {
+      document.getElementById('expression').value = '';
+    }
+
+    function backspace() {
+      const input = document.getElementById('expression');
+      input.value = input.value.slice(0, -1);
+    }
+
+    const ops = ['+', '-', '*', '/'];
+    const EPS = 1e-9;
+
+    function toEvalExpr(expr) {
+      return expr
+        .replace(/\{/g, '(')
+        .replace(/\}/g, ')')
+        .replace(/×/g, '*')
+        .replace(/÷/g, '/');
+    }
+
+    function helper(arr) {
+      if (arr.length === 1) return [arr[0]];
+      let res = [];
+      for (let i = 1; i < arr.length; i++) {
+        let lefts = helper(arr.slice(0, i));
+        let rights = helper(arr.slice(i));
+        for (const l of lefts) {
+          for (const r of rights) {
+            for (const op of ops) {
+              if (op === '/' && Math.abs(r.val) < EPS) continue;
+              let val, expr;
+              switch (op) {
+                case '+': val = l.val + r.val; expr = `(${l.expr}+${r.expr})`; break;
+                case '-': val = l.val - r.val; expr = `(${l.expr}-${r.expr})`; break;
+                case '*': val = l.val * r.val; expr = `(${l.expr}*${r.expr})`; break;
+                case '/': val = l.val / r.val; expr = `(${l.expr}/${r.expr})`; break;
+              }
+              res.push({val, expr});
+            }
+          }
+        }
+      }
+      return res;
+    }
+
+    function findAllExpressions(nums) {
+      let results = new Set();
+      let arr = nums.map(n => ({val: n, expr: n.toString()}));
+      let candidates = helper(arr);
+      for (const c of candidates) {
+        if (Math.abs(c.val - 10) < EPS) {
+          results.add(c.expr);
+          if (results.size >= 10) break;
+        }
+      }
+      return Array.from(results).slice(0, 3);
+    }
+
+    function checkAnswer() {
+      const exprRaw = document.getElementById('expression').value;
+      const expr = toEvalExpr(exprRaw);
+      try {
+        const usedNums = expr.match(/\d+/g)?.map(Number) || [];
+        const usedSorted = usedNums.slice().sort((a,b)=>a-b).join();
+        const givenSorted = currentNumbers.slice().sort((a,b)=>a-b).join();
+        const value = eval(expr);
+        if (Math.abs(value - 10) < EPS && usedSorted === givenSorted) {
+          document.getElementById('result').textContent = '🎉 正解！';
+        } else {
+          document.getElementById('result').textContent = '❌ 間違いです';
+        }
+      } catch (e) {
+        document.getElementById('result').textContent = '⚠️ 式が無効です';
+      }
+    }
+
+    function checkNoSolution() {
+      try {
+        let sols = findAllExpressions(currentNumbers);
+        const result = document.getElementById('result');
+        const isRare = currentNumbers.every(n => n >= 5);
+        if (sols.length === 0) {
+          if (isRare) {
+            result.textContent = '🎉 正解！この組み合わせは激レア！\n10を作れないことを見抜いたあなたは天才です！';
+          } else {
+            result.textContent = '🎉 正解！10を作る式が存在しない組み合わせです。';
+          }
+        } else {
+          result.textContent = '10を作れる式が存在します。頑張ってみてください！';
+        }
+      } catch {
+        document.getElementById('result').textContent = '⚠️ エラーが発生しました';
+      }
+    }
+
+    // 降参ボタンの処理：答えの例を表示する
+    function showHint() {
+      try {
+        let sols = findAllExpressions(currentNumbers);
+        const result = document.getElementById('result');
+        if (sols.length === 0) {
+          result.textContent = '解答例はありません。10を作る式は存在しません。';
+        } else {
+          // 表示用に日本の記号に変換する関数
+          function toJapaneseNotation(expr) {
+            return expr
+              .replace(/\*/g, '×')
+              .replace(/\//g, '÷')
+              .replace(/\{/g, '｛')
+              .replace(/\}/g, '｝');
+          }
+          let msg = '答えの例:\n';
+          sols.forEach((expr, i) => {
+            msg += `${i+1}: ${toJapaneseNotation(expr)}\n`;
+          });
+          if (sols.length >= 3) msg += 'など';
+          result.textContent = msg;
+        }
+      } catch {
+        document.getElementById('result').textContent = '⚠️ エラーが発生しました';
+      }
+    }
+
+    generateNumbers();
+  </script>
+
+</body>
+</html>
